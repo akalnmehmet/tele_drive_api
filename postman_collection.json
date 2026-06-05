@@ -7,7 +7,7 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:3000/api"
+      "value": "https://q5tkbpt1-3000.euw.devtunnels.ms/api"
     },
     {
       "key": "accessToken",
@@ -65,7 +65,9 @@
                   "const r=pm.response.json();",
                   "if(r.data.preAuthToken)pm.collectionVariables.set('preAuthToken',r.data.preAuthToken);",
                   "if(r.data.accessToken) pm.collectionVariables.set('accessToken', r.data.accessToken);",
-                  "if(r.data.refreshToken)pm.collectionVariables.set('refreshToken',r.data.refreshToken);"
+                  "if(r.data.refreshToken)pm.collectionVariables.set('refreshToken',r.data.refreshToken);",
+                  "// 2FA kapalıysa preAuthToken aslında full token — accessToken olarak da kaydet",
+                  "if(r.data.preAuthToken && !r.data.totpRequired) pm.collectionVariables.set('accessToken', r.data.preAuthToken);"
                 ]
               }
             }

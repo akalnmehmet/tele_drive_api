@@ -8,10 +8,12 @@ Gerçek zamanlı telemetri verisi toplayan, sensör arızalarını izleyen, Bull
 
 ## Özellikler
 
+- **Landing Page** — `GET /` ile API bilgisi ve endpoint listesi döner
 - **JWT + TOTP 2FA** — Pre-auth / full-auth iki aşamalı akış, refresh token rotasyonu (bcrypt hash)
 - **API Key Auth** — Araçlar `X-Api-Key` başlığıyla veri gönderir; kullanıcılar JWT kullanır
 - **RBAC** — `fleet_manager` (tam yetki) ve `engineer` (sadece okuma) rolleri
-- **Telemetri & Sensör Alımı** — GPS, hız, batarya; LiDAR, kamera, radar, IMU
+- **Telemetri & Sensör Alımı** — GPS, hız, batarya; LiDAR, kamera, radar, GPS, IMU
+- **Query Param Doğrulama** — Zod v4 ile hem body hem query parametreleri doğrulanır
 - **Otomatik Arıza Tespiti** — Sensör `fault` durumuna geçtiğinde araç statüsü güncellenir + BullMQ ile bildirim
 - **Asenkron Rapor Üretimi** — PDF (günlük sürüş) ve Excel (filo özeti) BullMQ worker'larıyla arka planda üretilir
 - **Rate Limiting** — Auth (10/15dk), Telemetri (300/dk), Genel (100/15dk)
@@ -38,47 +40,55 @@ Gerçek zamanlı telemetri verisi toplayan, sensör arızalarını izleyen, Bull
 
 ---
 
-## Proje Yapısı
+## Proje Yapısı (55 TypeScript Dosyası)
 
 ```
 tele_drive_API/
 ├── src/
 │   ├── common/
+│   │   ├── errors/
+│   │   │   ├── AppError.ts                    # Özel HTTP hata sınıfı
+│   │   │   └── error-handler.middleware.ts    # Global Express hata yakalama
 │   │   └── utils/
-│   │       ├── logger.ts              # Winston logger
-│   │       ├── totp.ts                # RFC 6238 TOTP (custom impl.)
-│   │       └── app-error.ts           # Özel hata sınıfı
+│   │       ├── logger.ts                      # Winston logger (JSON format)
+│   │       ├── mailer.ts                      # Nodemailer (graceful fail)
+│   │       └── totp.ts                        # RFC 6238 TOTP (custom impl.)
 │   ├── config/
-│   │   ├── env.ts                     # Zod ile env doğrulama
-│   │   ├── database.ts                # TypeORM DataSource
-│   │   └── redis.ts                   # IORedis bağlantısı
+│   │   ├── env.ts                             # Zod ile env doğrulama
+│   │   ├── database.ts                        # TypeORM DataSource
+│   │   └── redis.ts                           # IORedis bağlantısı
 │   ├── jobs/
-│   │   ├── queues.ts                  # BullMQ Queue tanımları
+│   │   ├── queues.ts                          # BullMQ Queue tanımları
 │   │   ├── processors/
-│   │   │   ├── generate-report.ts     # PDF + Excel üretimi
-│   │   │   └── send-fault-alert.ts    # E-posta bildirimi
+│   │   │   ├── generate-report.ts             # PDF + Excel üretimi, date normalizasyonu
+│   │   │   └── send-fault-alert.ts            # E-posta bildirimi
 │   │   └── workers/
-│   │       ├── report.worker.ts       # Rapor worker'ı
-│   │       └── notification.worker.ts # Bildirim worker'ı
+│   │       ├── report.worker.ts               # Rapor worker'ı (concurrency: 2)
+│   │       └── notification.worker.ts         # Bildirim worker'ı (concurrency: 5)
 │   ├── middleware/
-│   │   ├── authenticate.ts            # JWT doğrulama
-│   │   ├── authorize.ts               # RBAC rol kontrolü
-│   │   ├── api-key-auth.ts            # X-Api-Key doğrulama
-│   │   ├── validate.ts                # Zod body/query validation
-│   │   ├── rate-limit.ts              # Rate limiter'lar
-│   │   └── error-handler.ts           # Global hata yakalama
+│   │   ├── authenticate.ts                    # JWT doğrulama
+│   │   ├── authorize.ts                       # RBAC rol kontrolü
+│   │   ├── api-key-auth.ts                    # X-Api-Key doğrulama
+│   │   ├── validate.ts                        # Zod body/query validation
+│   │   └── rate-limit.ts                      # Rate limiter'lar
 │   ├── modules/
-│   │   ├── auth/                      # Kayıt, giriş, 2FA, token rotasyonu
-│   │   ├── vehicles/                  # Araç CRUD, API key yönetimi
-│   │   ├── telemetry/                 # Telemetri alımı ve sorgulama
-│   │   ├── sensors/                   # Sensör alımı, arıza tespiti
-│   │   ├── reports/                   # Rapor iş yönetimi
-│   │   └── users/                     # User entity
-│   ├── app.ts                         # Express app kurulumu
-│   └── main.ts                        # Bootstrap, worker başlatma
-├── .env.example                       # Örnek ortam değişkenleri
-├── docker-compose.yml                 # PostgreSQL + Redis
-├── postman_collection.json            # Hazır Postman koleksiyonu
+│   │   ├── auth/                              # Kayıt, giriş, 2FA, token rotasyonu (6 dosya)
+│   │   ├── vehicles/                          # Araç CRUD, API key yönetimi (5 dosya)
+│   │   ├── telemetry/                         # Telemetri alımı ve sorgulama (5 dosya)
+│   │   ├── sensors/                           # Sensör alımı, arıza tespiti (5 dosya)
+│   │   ├── reports/                           # Rapor iş yönetimi (4 dosya)
+│   │   └── users/                             # User entity + repository (2 dosya)
+│   ├── app.ts                                 # Express app, middleware, landing page
+│   └── main.ts                                # Bootstrap, worker başlatma, graceful shutdown
+├── scripts/
+│   ├── gen-docx.mjs                           # Teknik doküman üretici
+│   ├── gen-readme.mjs                         # README üretici
+│   └── gen-postman.mjs                        # Postman koleksiyonu üretici
+├── .env.example                               # Örnek ortam değişkenleri
+├── .gitignore
+├── docker-compose.yml                         # PostgreSQL + Redis
+├── postman_collection.json                    # 28 endpoint, 5 klasör
+├── TeleDrive_API_Teknik_Dokuman_v1.docx       # Teknik tasarım dokümanı
 ├── tsconfig.json
 └── package.json
 ```
@@ -117,7 +127,7 @@ cp .env.example .env
 |----------|----------|
 | `JWT_SECRET` | En az 64 karakterlik rastgele string (zorunlu) |
 | `DB_PORT` | Docker kullanıyorsan `5433`, aksi halde `5432` |
-| `SMTP_*` | E-posta bildirimleri için (isteğe bağlı) |
+| `SMTP_*` | E-posta bildirimleri için (isteğe bağlı — yoksa uygulama çalışmaya devam eder) |
 
 ### 4. Docker ile Altyapıyı Başlat
 
@@ -145,11 +155,38 @@ node dist/main.js
 
 ## API Referansı
 
-**Temel URL:** `http://localhost:3000/api`
+**Temel URL (yerel):** `http://localhost:3000/api`
 
 Tüm yanıtlar şu formattadır:
 ```json
 { "status": "success" | "error", "data": { ... } }
+```
+
+---
+
+### Genel Endpoint'ler
+
+| Metod | Yol | Açıklama | Auth |
+|-------|-----|----------|------|
+| `GET` | `/` | Landing page — API bilgisi ve endpoint listesi | — |
+| `GET` | `/health` | Sağlık kontrolü | — |
+
+**Landing Page Yanıtı:**
+```json
+{
+  "name": "TeleDrive API",
+  "description": "Otonom Araç Telemetri ve Filo Yönetim REST API",
+  "version": "1.0.0",
+  "status": "🟢 online",
+  "timestamp": "2026-06-05T10:00:00.000Z",
+  "endpoints": {
+    "auth": "/api/auth",
+    "vehicles": "/api/vehicles",
+    "telemetry": "/api/telemetry",
+    "sensors": "/api/sensors",
+    "reports": "/api/reports"
+  }
+}
 ```
 
 ---
@@ -182,12 +219,13 @@ POST /api/auth/register
 ```json
 {
   "data": {
-    "accessToken": "eyJ...",
+    "preAuthToken": "eyJ...",
     "refreshToken": "eyJ...",
     "totpRequired": false
   }
 }
 ```
+> `totpRequired: false` ise `preAuthToken` doğrudan tüm korumalı endpoint'lerde `Bearer` token olarak kullanılabilir.
 
 **Login Yanıtı (2FA'lı):**
 ```json
@@ -249,10 +287,14 @@ X-Api-Key: td_abc123...
 }
 ```
 
-**Sorgulama Query Parametreleri:**
-- `from` / `to` — ISO 8601 tarih (varsayılan: son 24 saat)
-- `limit` — maks kayıt sayısı (varsayılan: 100, maks: 1000)
-- `offset` — sayfalama
+**Sorgulama Query Parametreleri** (Zod ile doğrulanır):
+
+| Parametre | Tip | Varsayılan | Kural |
+|-----------|-----|-----------|-------|
+| `from` | ISO 8601 string | Son 24 saat | `datetime()` formatı zorunlu |
+| `to` | ISO 8601 string | Şimdi | `datetime()` formatı zorunlu |
+| `limit` | sayı string | 100 | Maks: 1000 |
+| `offset` | sayı string | 0 | Sayfalama |
 
 ---
 
@@ -280,6 +322,9 @@ X-Api-Key: td_abc123...
   "value": { "error": "lens_blocked" }
 }
 ```
+
+**`/sensors/history` Query Parametreleri** (Zod ile doğrulanır):
+- `from` / `to` — ISO 8601 datetime string (isteğe bağlı)
 
 ---
 
@@ -313,6 +358,8 @@ X-Api-Key: td_abc123...
 
 **Rapor Durumları:** `pending` → `processing` → `done` / `failed`
 
+> `done` olduğunda `GET /:id/download` ile dosyayı indirin.
+
 ---
 
 ## Kimlik Doğrulama Akışları
@@ -321,7 +368,7 @@ X-Api-Key: td_abc123...
 
 ```
 POST /register  →  kullanıcı oluşturulur
-POST /login     →  accessToken (15dk) + refreshToken (7gün)
+POST /login     →  preAuthToken (15dk) + refreshToken (7gün)
                          ↓ token süresi dolunca
 POST /refresh   →  yeni accessToken + yeni refreshToken (rotasyon)
 POST /logout    →  refreshToken geçersizleştirilir
@@ -357,7 +404,7 @@ Araç Cihazı
               └── status: "fault"?
                     ├── Vehicle.status → FAULT
                     └── BullMQ → notifications queue
-                                    └── E-posta: mühendise bildirim
+                                    └── Nodemailer → mühendise e-posta
 ```
 
 ---
@@ -382,8 +429,8 @@ Tüm değişkenler için `.env.example` dosyasına bakın.
 |----------|----------|
 | `JWT_SECRET` | En az 64 karakter — üretimde mutlaka değiştirin |
 | `DB_PORT` | Docker: `5433`, yerel PostgreSQL yoksa: `5432` |
-| `SMTP_HOST` | Yoksa bildirimler graceful olarak atlanır |
-| `REPORTS_DIR` | PDF/Excel dosyalarının kaydedileceği klasör |
+| `SMTP_HOST` | Yoksa bildirimler graceful olarak atlanır, uygulama çalışmaya devam eder |
+| `REPORTS_DIR` | PDF/Excel dosyalarının kaydedileceği klasör (varsayılan: `./tmp/reports`) |
 
 ---
 
@@ -396,15 +443,46 @@ Tüm değişkenler için `.env.example` dosyasına bakın.
 3. **Create Vehicle** çalıştır (`vehicleId` + `vehicleApiKey` otomatik set edilir)
 4. Tüm 28 endpoint kullanıma hazır
 
+**Klasörler:** Auth (8) · Vehicles (7) · Telemetry (4) · Sensors (5) · Reports (5)
+
 **Collection Variables:** `baseUrl` · `accessToken` · `refreshToken` · `preAuthToken` · `vehicleId` · `vehicleApiKey` · `reportId`
+
+---
+
+## Teknik Notlar
+
+### TypeORM Date Normalizasyonu
+
+PostgreSQL `DATE` kolonları TypeORM'dan TypeScript'e `string` olarak döner. Bu nedenle rapor processor'da `.toISOString()` doğrudan çağrılmaz:
+
+```typescript
+// YANLIŞ — TypeError atar
+job.dateFrom.toISOString()
+
+// DOĞRU — normalize et
+new Date(job.dateFrom).toISOString()
+```
+
+### BullMQ Bağlantısı
+
+BullMQ kendi `ioredis` sürümünü bundle'a dahil eder. Dışarıdan `Redis` instance geçmek tip çakışması yaratır. Bu yüzden raw connection options kullanılır:
+
+```typescript
+{ connection: { host: env.REDIS_HOST, port: env.REDIS_PORT } }
+```
+
+### Custom TOTP
+
+`otplib` v13 Node.js 20'de API uyumsuzluğu nedeniyle kullanılamadığından `src/common/utils/totp.ts` içinde RFC 6238'e uygun custom implementasyon geliştirilmiştir. Node.js `crypto` modülü kullanılır, dış bağımlılık yoktur.
 
 ---
 
 ## Geliştirme Komutları
 
 ```bash
-npm run dev      # ts-node-dev ile hot-reload geliştirme
-npm run build    # TypeScript → dist/ derle
+npm run dev       # ts-node-dev ile hot-reload geliştirme
+npm run build     # TypeScript → dist/ derle
+npx tsc --noEmit  # Tip kontrolü (derleme yapmadan)
 ```
 
 ---

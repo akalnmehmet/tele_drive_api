@@ -20,6 +20,25 @@ app.use(defaultLimiter);
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Landing page
+app.get('/', (_req, res) => {
+  res.json({
+    name:        'TeleDrive API',
+    description: 'Otonom Araç Telemetri ve Filo Yönetim REST API',
+    version:     '1.0.0',
+    status:      '🟢 online',
+    timestamp:   new Date().toISOString(),
+    endpoints: {
+      auth:      '/api/auth',
+      vehicles:  '/api/vehicles',
+      telemetry: '/api/telemetry',
+      sensors:   '/api/sensors',
+      reports:   '/api/reports',
+    },
+    docs: 'https://github.com/realsenseai/tele-drive-api',
+  });
+});
+
 // Health check
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
