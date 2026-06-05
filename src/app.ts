@@ -8,6 +8,7 @@ import vehicleRoutes    from './modules/vehicles/vehicle.routes';
 import telemetryRoutes  from './modules/telemetry/telemetry.routes';
 import sensorRoutes     from './modules/sensors/sensor.routes';
 import reportRoutes     from './modules/reports/report.routes';
+import dashboardRoutes  from './modules/dashboard/dashboard.routes';
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.get('/', (_req, res) => {
       telemetry: '/api/telemetry',
       sensors:   '/api/sensors',
       reports:   '/api/reports',
+      dashboard: '/api/dashboard',
     },
     docs: 'https://github.com/realsenseai/tele-drive-api',
   });
@@ -50,6 +52,7 @@ app.use('/api/vehicles',  vehicleRoutes);
 app.use('/api/telemetry', telemetryRoutes);
 app.use('/api/sensors',   sensorRoutes);
 app.use('/api/reports',   reportRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // 404 handler
 app.use((_req, res) => {
