@@ -1,0 +1,658 @@
+{
+  "info": {
+    "name": "TeleDrive API",
+    "description": "Otonom Araç Telemetri ve Filo Yönetim API - v1.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "preAuthToken",
+      "value": ""
+    },
+    {
+      "key": "vehicleId",
+      "value": ""
+    },
+    {
+      "key": "vehicleApiKey",
+      "value": ""
+    },
+    {
+      "key": "reportId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@teledrive.io\",\n  \"password\": \"Admin1234!\",\n  \"role\": \"fleet_manager\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r=pm.response.json();",
+                  "if(r.data.preAuthToken)pm.collectionVariables.set('preAuthToken',r.data.preAuthToken);",
+                  "if(r.data.accessToken) pm.collectionVariables.set('accessToken', r.data.accessToken);",
+                  "if(r.data.refreshToken)pm.collectionVariables.set('refreshToken',r.data.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@teledrive.io\",\n  \"password\": \"Admin1234!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/me"
+          }
+        },
+        {
+          "name": "2FA - Setup (QR kodu)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/2fa/setup"
+          }
+        },
+        {
+          "name": "2FA - Enable",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/2fa/enable",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"123456\"\n}"
+            }
+          }
+        },
+        {
+          "name": "2FA - Verify (2FA aktifken login)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r=pm.response.json();",
+                  "if(r.data.accessToken) pm.collectionVariables.set('accessToken', r.data.accessToken);",
+                  "if(r.data.refreshToken)pm.collectionVariables.set('refreshToken',r.data.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{preAuthToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/2fa/verify",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"123456\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r=pm.response.json();",
+                  "if(r.data.accessToken) pm.collectionVariables.set('accessToken', r.data.accessToken);",
+                  "if(r.data.refreshToken)pm.collectionVariables.set('refreshToken',r.data.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/refresh",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Vehicles",
+      "item": [
+        {
+          "name": "List Vehicles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vehicles",
+              "query": [
+                {
+                  "key": "status",
+                  "value": "active",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Vehicle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r=pm.response.json();",
+                  "if(r.data&&r.data.id)    pm.collectionVariables.set('vehicleId',    r.data.id);",
+                  "if(r.data&&r.data.apiKey)pm.collectionVariables.set('vehicleApiKey',r.data.apiKey);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/vehicles",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plate\": \"34TDR01\",\n  \"model\": \"Tesla Model 3\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Vehicle",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/vehicles/{{vehicleId}}"
+          }
+        },
+        {
+          "name": "Get Vehicle Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/vehicles/{{vehicleId}}/status"
+          }
+        },
+        {
+          "name": "Update Vehicle",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/vehicles/{{vehicleId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"active\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Rotate API Key",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r=pm.response.json();",
+                  "if(r.data&&r.data.apiKey)pm.collectionVariables.set('vehicleApiKey',r.data.apiKey);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/vehicles/{{vehicleId}}/rotate-api-key"
+          }
+        },
+        {
+          "name": "Delete Vehicle",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/vehicles/{{vehicleId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Telemetry",
+      "item": [
+        {
+          "name": "Ingest Telemetry (API Key)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Api-Key",
+                "value": "{{vehicleApiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/telemetry",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"speed\": 72.5,\n  \"latitude\": 41.015137,\n  \"longitude\": 28.97953,\n  \"batteryLevel\": 84.3,\n  \"recordedAt\": \"2026-06-05T10:00:00Z\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Telemetry by Range",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vehicles/{{vehicleId}}/telemetry?from=2026-06-01T00:00:00Z&to=2026-06-05T23:59:59Z&limit=50&offset=0",
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-06-01T00:00:00Z"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-06-05T23:59:59Z"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Latest Telemetry",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/vehicles/{{vehicleId}}/telemetry/latest"
+          }
+        },
+        {
+          "name": "Get Telemetry Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vehicles/{{vehicleId}}/telemetry/stats?from=2026-06-01T00:00:00Z&to=2026-06-05T23:59:59Z",
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-06-01T00:00:00Z"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-06-05T23:59:59Z"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Sensors",
+      "item": [
+        {
+          "name": "Ingest Sensor - OK (API Key)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Api-Key",
+                "value": "{{vehicleApiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/sensors",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sensorType\": \"lidar\",\n  \"status\": \"ok\",\n  \"value\": {\n    \"range\": 12.4\n  },\n  \"recordedAt\": \"2026-06-05T10:00:00Z\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Ingest Sensor - FAULT (BullMQ alert tetikler)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Api-Key",
+                "value": "{{vehicleApiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/sensors",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sensorType\": \"camera\",\n  \"status\": \"fault\",\n  \"value\": {\n    \"error\": \"lens_blocked\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "List Sensors",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/vehicles/{{vehicleId}}/sensors"
+          }
+        },
+        {
+          "name": "List Fault Sensors",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/vehicles/{{vehicleId}}/sensors/faults"
+          }
+        },
+        {
+          "name": "Sensor History by Range",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vehicles/{{vehicleId}}/sensors/history?from=2026-06-01T00:00:00Z&to=2026-06-05T23:59:59Z",
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-06-01T00:00:00Z"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-06-05T23:59:59Z"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Reports",
+      "item": [
+        {
+          "name": "Create PDF Report (daily_pdf)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r=pm.response.json(); if(r.data&&r.data.id)pm.collectionVariables.set('reportId',r.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/reports",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"daily_pdf\",\n  \"vehicleId\": \"{{vehicleId}}\",\n  \"dateFrom\": \"2026-06-01\",\n  \"dateTo\": \"2026-06-05\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Fleet Excel Report (fleet_excel)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r=pm.response.json(); if(r.data&&r.data.id)pm.collectionVariables.set('reportId',r.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/reports",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"fleet_excel\",\n  \"dateFrom\": \"2026-06-01\",\n  \"dateTo\": \"2026-06-05\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List Reports",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/reports"
+          }
+        },
+        {
+          "name": "Get Report Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/reports/{{reportId}}"
+          }
+        },
+        {
+          "name": "Download Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/reports/{{reportId}}/download"
+          }
+        }
+      ]
+    }
+  ]
+}
