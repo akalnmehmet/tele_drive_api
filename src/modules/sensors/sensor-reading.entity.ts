@@ -25,6 +25,7 @@ export enum SensorStatus {
 
 @Entity('sensor_readings')
 @Index(['vehicleId', 'recordedAt'])
+@Index(['vehicleId', 'sensorType', 'recordedAt'])
 export class SensorReading {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

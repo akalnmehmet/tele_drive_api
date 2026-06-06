@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { User } from '../users/user.entity';
 import { Vehicle } from '../vehicles/vehicle.entity';
@@ -22,6 +23,8 @@ export enum ReportStatus {
 }
 
 @Entity('report_jobs')
+@Index(['requestedById'])
+@Index(['status', 'createdAt'])
 export class ReportJob {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

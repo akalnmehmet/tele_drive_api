@@ -4,9 +4,16 @@ import { VehicleService } from './vehicle.service';
 export const VehicleController = {
   async findAll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { status, model } = req.query as { status?: string; model?: string };
-      const vehicles = await VehicleService.findAll({ status, model });
-      res.json({ status: 'success', data: vehicles });
+      const { status, model, limit, offset } = req.query as {
+        status?: string; model?: string; limit?: string; offset?: string;
+      };
+      const result = await VehicleService.findAll({
+        status,
+        model,
+        limit:  limit  ? parseInt(limit,  10) : undefined,
+        offset: offset ? parseInt(offset, 10) : undefined,
+      });
+      res.json({ status: 'success', data: result });
     } catch (err) { next(err); }
   },
 

@@ -1,14 +1,17 @@
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import swaggerUi from 'swagger-ui-express';
 import { defaultLimiter } from './middleware/rate-limit';
 import { errorHandler } from './common/errors/error-handler.middleware';
+import { swaggerSpec } from './config/swagger';
 import authRoutes       from './modules/auth/auth.routes';
 import vehicleRoutes    from './modules/vehicles/vehicle.routes';
 import telemetryRoutes  from './modules/telemetry/telemetry.routes';
 import sensorRoutes     from './modules/sensors/sensor.routes';
 import reportRoutes     from './modules/reports/report.routes';
 import dashboardRoutes  from './modules/dashboard/dashboard.routes';
+import userRoutes       from './modules/users/user.routes';
 
 const app = express();
 
@@ -36,8 +39,10 @@ app.get('/', (_req, res) => {
       sensors:   '/api/sensors',
       reports:   '/api/reports',
       dashboard: '/api/dashboard',
+      users:     '/api/users',
+      docs:      '/api/docs',
     },
-    docs: 'https://github.com/realsenseai/tele-drive-api',
+    docs: '/api/docs',
   });
 });
 
@@ -46,6 +51,9 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Swagger UI
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 // Modül route'ları
 app.use('/api/auth',      authRoutes);
 app.use('/api/vehicles',  vehicleRoutes);
@@ -53,6 +61,7 @@ app.use('/api/telemetry', telemetryRoutes);
 app.use('/api/sensors',   sensorRoutes);
 app.use('/api/reports',   reportRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/users',    userRoutes);
 
 // 404 handler
 app.use((_req, res) => {

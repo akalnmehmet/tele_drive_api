@@ -15,8 +15,8 @@ export function validate(schema: ZodSchema, source: Source = 'body') {
       return;
     }
     if (source === 'query') {
-      // validated query params'ı req.query'e yaz
-      req.query = result.data as Record<string, string>;
+      // Express v5'te req.query read-only getter — mevcut objeyi mutate et
+      Object.assign(req.query, result.data);
     } else {
       req.body = result.data;
     }

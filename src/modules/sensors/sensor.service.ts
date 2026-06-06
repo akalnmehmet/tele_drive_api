@@ -53,22 +53,24 @@ export const SensorService = {
     return saved;
   },
 
-  // ── Araç sensör listesi ───────────────────────────────────────────────────
+  // ── Araç sensör listesi (her tip için en son kayıt) ──────────────────────
   async findByVehicle(vehicleId: string) {
     const vehicle = await VehicleRepository.findOne({ where: { id: vehicleId } });
     if (!vehicle) throw new AppError('Araç bulunamadı', 404);
-    return SensorRepository.findLatestByVehicle(vehicleId);
+    const sensors = await SensorRepository.findLatestByVehicle(vehicleId);
+    return { sensors, total: sensors.length };
   },
 
   // ── Sadece arızalı sensörler ──────────────────────────────────────────────
   async findFaults(vehicleId: string) {
     const vehicle = await VehicleRepository.findOne({ where: { id: vehicleId } });
     if (!vehicle) throw new AppError('Araç bulunamadı', 404);
-    return SensorRepository.findFaults(vehicleId);
+    const sensors = await SensorRepository.findFaults(vehicleId);
+    return { sensors, total: sensors.length };
   },
 
   // ── Geçmiş veriler ────────────────────────────────────────────────────────
-  async findByRange(vehicleId: string, query: { from?: string; to?: string; limit?: string }) {
+  async findByRange(vehicleId: string, query: { from?: string; to?: string; limit?: string; sensorType?: string }) {
     const vehicle = await VehicleRepository.findOne({ where: { id: vehicleId } });
     if (!vehicle) throw new AppError('Araç bulunamadı', 404);
 
@@ -77,7 +79,7 @@ export const SensorService = {
     const to    = now;
     const limit = Math.min(parseInt(query.limit ?? '200'), 1000);
 
-    const [readings, total] = await SensorRepository.findByRange(vehicleId, from, to, limit);
-    return { readings, total, from, to };
+    const [readings, total] = await SensorRepository.findByRange(vehicleId, from, to, limit, query.sensorType);
+    return { readings, total, limit, from, to, sensorType: query.sensorType ?? null };
   },
 };

@@ -1,8 +1,9 @@
 import { Worker } from 'bullmq';
 import { env } from '../../config/env';
 import { processFaultAlert, processReportReady } from '../processors/send-fault-alert';
+import { processThresholdAlert } from '../processors/send-threshold-alert';
 import { logger } from '../../common/utils/logger';
-import type { FaultAlertJobData, ReportReadyJobData } from '../queues';
+import type { FaultAlertJobData, ReportReadyJobData, ThresholdAlertJobData } from '../queues';
 
 const connection = { host: env.REDIS_HOST, port: env.REDIS_PORT };
 
@@ -16,6 +17,8 @@ export function startNotificationWorker(): Worker {
         await processFaultAlert(job.data as FaultAlertJobData);
       } else if (job.name === 'report-ready') {
         await processReportReady(job.data as ReportReadyJobData);
+      } else if (job.name === 'threshold-alert') {
+        await processThresholdAlert(job.data as ThresholdAlertJobData);
       } else {
         logger.warn('Bilinmeyen bildirim tipi', { name: job.name });
       }

@@ -7,6 +7,7 @@ import {
   ManyToOne,
   OneToMany,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { User } from '../users/user.entity';
 import { TelemetryReading } from '../telemetry/telemetry.entity';
@@ -20,6 +21,8 @@ export enum VehicleStatus {
 }
 
 @Entity('vehicles')
+@Index(['status'])
+@Index(['assignedEngineerId'])
 export class Vehicle {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -38,6 +41,14 @@ export class Vehicle {
 
   @Column({ name: 'assigned_engineer_id', nullable: true, type: 'uuid' })
   assignedEngineerId!: string | null;
+
+  // Batarya eşiği: bu değerin altına düşünce alert gönderilir (% cinsinden)
+  @Column({ name: 'low_battery_threshold', type: 'float', default: 20 })
+  lowBatteryThreshold!: number;
+
+  // Hız eşiği: bu değerin üzerine çıkınca alert gönderilir (km/h), null = devre dışı
+  @Column({ name: 'max_speed_threshold', type: 'float', nullable: true })
+  maxSpeedThreshold!: number | null;
 
   @ManyToOne(() => User, (user) => user.vehicles, { nullable: true })
   @JoinColumn({ name: 'assigned_engineer_id' })

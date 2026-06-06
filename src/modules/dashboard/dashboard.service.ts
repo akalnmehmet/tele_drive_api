@@ -22,6 +22,7 @@ export interface LowBatteryVehicle {
   vehicleId:    string;
   plate:        string;
   batteryLevel: number;
+  threshold:    number;
   recordedAt:   string;
 }
 
@@ -85,7 +86,7 @@ async function getTelemetryStats(since: Date): Promise<Telemetry24h> {
 
 /**
  * Her aracın en son telemetri kaydını çeker;
- * batarya seviyesi %20'nin altında olanları döner.
+ * batarya seviyesi aracın lowBatteryThreshold değerinin altında olanları döner.
  * DISTINCT ON — PostgreSQL özgü, raw SQL ile yapılır.
  */
 async function getLowBatteryVehicles(): Promise<LowBatteryVehicle[]> {
@@ -98,22 +99,24 @@ async function getLowBatteryVehicles(): Promise<LowBatteryVehicle[]> {
       FROM   telemetry_readings
       ORDER  BY vehicle_id, recorded_at DESC
     )
-    SELECT  l.vehicle_id       AS "vehicleId",
+    SELECT  l.vehicle_id           AS "vehicleId",
             v.plate,
             l.battery_level::float AS "batteryLevel",
-            l.recorded_at          AS "recordedAt"
+            l.recorded_at          AS "recordedAt",
+            v.low_battery_threshold AS "threshold"
     FROM    latest l
     JOIN    vehicles v ON v.id = l.vehicle_id
-    WHERE   l.battery_level < 20
+    WHERE   l.battery_level < v.low_battery_threshold
     ORDER   BY l.battery_level ASC
   `;
-  const rows: { vehicleId: string; plate: string; batteryLevel: number; recordedAt: Date }[] =
+  const rows: { vehicleId: string; plate: string; batteryLevel: number; threshold: number; recordedAt: Date }[] =
     await AppDataSource.query(sql);
 
   return rows.map((r) => ({
     vehicleId:    r.vehicleId,
     plate:        r.plate,
     batteryLevel: Math.round(r.batteryLevel * 10) / 10,
+    threshold:    r.threshold,
     recordedAt:   new Date(r.recordedAt).toISOString(),
   }));
 }

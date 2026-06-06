@@ -18,8 +18,10 @@ export const ReportController = {
   // GET /reports
   async findAll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const jobs = await ReportService.findByUser(req.user!.userId);
-      res.json({ status: 'success', data: jobs });
+      const limit  = req.query['limit']  ? parseInt(req.query['limit']  as string, 10) : 20;
+      const offset = req.query['offset'] ? parseInt(req.query['offset'] as string, 10) : 0;
+      const result = await ReportService.findByUser(req.user!.userId, limit, offset);
+      res.json({ status: 'success', data: result });
     } catch (err) { next(err); }
   },
 

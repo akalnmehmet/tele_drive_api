@@ -38,12 +38,18 @@ export const ReportService = {
   },
 
   // ── Kullanıcının raporları ────────────────────────────────────────────────
-  async findByUser(requestedById: string): Promise<ReportJob[]> {
-    return repo().find({
+  async findByUser(
+    requestedById: string,
+    limit = 20,
+    offset = 0,
+  ): Promise<{ reports: ReportJob[]; total: number; limit: number; offset: number }> {
+    const [reports, total] = await repo().findAndCount({
       where: { requestedById },
       order: { createdAt: 'DESC' },
-      take: 50,
+      take: Math.min(limit, 100),
+      skip: offset,
     });
+    return { reports, total, limit, offset };
   },
 
   // ── Tek rapor durumu ──────────────────────────────────────────────────────

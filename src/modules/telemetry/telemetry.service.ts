@@ -1,7 +1,10 @@
 import { AppError } from '../../common/errors/AppError';
 import { TelemetryRepository } from './telemetry.repository';
 import { VehicleRepository } from '../vehicles/vehicle.repository';
+import { UserRepository } from '../users/user.repository';
 import { VehicleStatus } from '../vehicles/vehicle.entity';
+import { notificationQueue } from '../../jobs/queues';
+import { logger } from '../../common/utils/logger';
 import type { IngestTelemetryDto } from './dto/ingest-telemetry.dto';
 
 const DEFAULT_LIMIT  = 100;
@@ -21,10 +24,50 @@ export const TelemetryService = {
 
     const saved = await TelemetryRepository.save(reading);
 
-    // Araç durumunu güncelle (speed>0 → active, aksi idle)
-    await VehicleRepository.update(vehicleId, {
-      status: dto.speed > 0 ? VehicleStatus.ACTIVE : VehicleStatus.IDLE,
-    });
+    // Araç bilgilerini çek (eşik + mühendis bilgisi için)
+    const vehicle = await VehicleRepository.findById(vehicleId);
+    if (!vehicle) return saved;
+
+    // Araç durumunu güncelle (speed>0 → active, aksi idle — FAULT ise değiştirme)
+    if (vehicle.status !== VehicleStatus.FAULT) {
+      await VehicleRepository.update(vehicleId, {
+        status: dto.speed > 0 ? VehicleStatus.ACTIVE : VehicleStatus.IDLE,
+      });
+    }
+
+    // Mühendis e-postası (alert için)
+    let engineerEmail: string | null = null;
+    if (vehicle.assignedEngineerId) {
+      const engineer = await UserRepository.findById(vehicle.assignedEngineerId);
+      engineerEmail = engineer?.email ?? null;
+    }
+
+    // ── Eşik kontrolleri ───────────────────────────────────────────────────────
+    const basePayload = { vehicleId, vehiclePlate: vehicle.plate, engineerEmail };
+
+    if (dto.batteryLevel < vehicle.lowBatteryThreshold) {
+      await notificationQueue.add('threshold-alert', {
+        ...basePayload,
+        alertType: 'low_battery',
+        value:     dto.batteryLevel,
+        threshold: vehicle.lowBatteryThreshold,
+      });
+      logger.warn('Düşük batarya eşiği aşıldı', {
+        vehicleId, batteryLevel: dto.batteryLevel, threshold: vehicle.lowBatteryThreshold,
+      });
+    }
+
+    if (vehicle.maxSpeedThreshold !== null && dto.speed > vehicle.maxSpeedThreshold) {
+      await notificationQueue.add('threshold-alert', {
+        ...basePayload,
+        alertType: 'high_speed',
+        value:     dto.speed,
+        threshold: vehicle.maxSpeedThreshold,
+      });
+      logger.warn('Hız eşiği aşıldı', {
+        vehicleId, speed: dto.speed, threshold: vehicle.maxSpeedThreshold,
+      });
+    }
 
     return saved;
   },

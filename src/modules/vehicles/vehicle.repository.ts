@@ -10,14 +10,17 @@ export const VehicleRepository = AppDataSource.getRepository(Vehicle).extend({
     return this.findOne({ where: { apiKey } });
   },
 
-  findAll(filters: { status?: string; model?: string }) {
+  findAll(filters: { status?: string; model?: string; limit?: number; offset?: number }) {
+    const { limit = 20, offset = 0 } = filters;
     const qb = this.createQueryBuilder('vehicle')
       .leftJoinAndSelect('vehicle.assignedEngineer', 'engineer')
-      .orderBy('vehicle.createdAt', 'DESC');
+      .orderBy('vehicle.createdAt', 'DESC')
+      .take(Math.min(limit, 100))
+      .skip(offset);
 
     if (filters.status) qb.andWhere('vehicle.status = :status', { status: filters.status });
     if (filters.model)  qb.andWhere('LOWER(vehicle.model) LIKE :model', { model: `%${filters.model.toLowerCase()}%` });
 
-    return qb.getMany();
+    return qb.getManyAndCount();
   },
 });

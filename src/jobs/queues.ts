@@ -25,6 +25,15 @@ export interface ReportReadyJobData {
   fileName: string;
 }
 
+export interface ThresholdAlertJobData {
+  vehicleId:    string;
+  vehiclePlate: string;
+  alertType:    'low_battery' | 'high_speed';
+  value:        number;
+  threshold:    number;
+  engineerEmail: string | null;
+}
+
 // ── Queue singleton'ları ──────────────────────────────────────────────────────
 
 export const reportQueue = new Queue<ReportJobData, void, string>('report-generation', {
@@ -37,7 +46,7 @@ export const reportQueue = new Queue<ReportJobData, void, string>('report-genera
   },
 });
 
-export const notificationQueue = new Queue<FaultAlertJobData | ReportReadyJobData, void, string>('notifications', {
+export const notificationQueue = new Queue<FaultAlertJobData | ReportReadyJobData | ThresholdAlertJobData, void, string>('notifications', {
   connection,
   defaultJobOptions: {
     attempts: 3,

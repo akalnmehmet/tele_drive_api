@@ -12,8 +12,9 @@ function generateApiKey(): string {
 }
 
 export const VehicleService = {
-  async findAll(filters: { status?: string; model?: string }) {
-    return VehicleRepository.findAll(filters);
+  async findAll(filters: { status?: string; model?: string; limit?: number; offset?: number }) {
+    const [vehicles, total] = await VehicleRepository.findAll(filters);
+    return { vehicles, total, limit: filters.limit ?? 20, offset: filters.offset ?? 0 };
   },
 
   async findById(id: string) {
@@ -59,6 +60,8 @@ export const VehicleService = {
 
     if (dto.model)  vehicle.model = dto.model;
     if (dto.status) vehicle.status = dto.status as VehicleStatus;
+    if (dto.lowBatteryThreshold !== undefined) vehicle.lowBatteryThreshold = dto.lowBatteryThreshold;
+    if (dto.maxSpeedThreshold   !== undefined) vehicle.maxSpeedThreshold   = dto.maxSpeedThreshold;
 
     if (dto.assignedEngineerId !== undefined) {
       if (dto.assignedEngineerId === null) {
