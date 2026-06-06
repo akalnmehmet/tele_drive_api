@@ -2,12 +2,13 @@
 
 > **Otonom Araç Telemetri ve Filo Yönetim REST API'si**
 
-Gerçek zamanlı telemetri verisi toplayan, sensör arızalarını izleyen, BullMQ kuyrukları üzerinden asenkron rapor üreten ve JWT + TOTP 2FA ile güvenli kimlik doğrulama sağlayan production-ready bir API.
+Gerçek zamanlı telemetri verisi toplayan, sensör arızalarını izleyen, batarya/hız eşiği aşımlarında otomatik uyarı tetikleyen, BullMQ kuyrukları üzerinden asenkron rapor üreten ve JWT + TOTP 2FA ile güvenli kimlik doğrulama sağlayan production-ready bir API.
 
 ---
 
 ## Özellikler
 
+- **Swagger UI** — `GET /api/docs` ile interaktif API dokümantasyonu ve test arayüzü
 - **Landing Page** — `GET /` ile API bilgisi ve endpoint listesi döner
 - **JWT + TOTP 2FA** — Pre-auth / full-auth iki aşamalı akış, refresh token rotasyonu (bcrypt hash)
 - **API Key Auth** — Araçlar `X-Api-Key` başlığıyla veri gönderir; kullanıcılar JWT kullanır
@@ -15,6 +16,11 @@ Gerçek zamanlı telemetri verisi toplayan, sensör arızalarını izleyen, Bull
 - **Telemetri & Sensör Alımı** — GPS, hız, batarya; LiDAR, kamera, radar, GPS, IMU
 - **Query Param Doğrulama** — Zod v4 ile hem body hem query parametreleri doğrulanır
 - **Otomatik Arıza Tespiti** — Sensör `fault` durumuna geçtiğinde araç statüsü güncellenir + BullMQ ile bildirim
+- **Batarya & Hız Eşiği Uyarıları** — Araç başına özelleştirilebilir `lowBatteryThreshold` / `maxSpeedThreshold`; ihlalde mühendise e-posta kuyruğa alınır
+- **Sayfalama (Pagination)** — Araçlar ve raporlar `?limit` + `?offset` ile sorgulanabilir (maks. 100)
+- **Sensör Tipi Filtresi** — Sensör geçmişi `?sensorType=lidar|camera|radar|gps|imu` ile filtrelenebilir
+- **Kullanıcı Yönetimi** — `fleet_manager` tüm kullanıcıları listeleyebilir, rol atayabilir, silebilir
+- **Dashboard** — Filo özet istatistikleri (araç sayıları, arıza durumu, düşük batarya listesi)
 - **Asenkron Rapor Üretimi** — PDF (günlük sürüş) ve Excel (filo özeti) BullMQ worker'larıyla arka planda üretilir
 - **Rate Limiting** — Auth (10/15dk), Telemetri (300/dk), Genel (100/15dk)
 - **Graceful Shutdown** — SIGTERM/SIGINT'te worker'lar temiz kapatılır
@@ -33,6 +39,7 @@ Gerçek zamanlı telemetri verisi toplayan, sensör arızalarını izleyen, Bull
 | Kuyruk | BullMQ + Redis | v5 / 7 |
 | Auth | jsonwebtoken + custom TOTP | RFC 6238 |
 | Validation | Zod | v4 |
+| API Docs | swagger-jsdoc + swagger-ui-express | OpenAPI 3.0.3 |
 | PDF | PDFKit | — |
 | Excel | ExcelJS | — |
 | E-posta | Nodemailer | — |
@@ -40,7 +47,7 @@ Gerçek zamanlı telemetri verisi toplayan, sensör arızalarını izleyen, Bull
 
 ---
 
-## Proje Yapısı (55 TypeScript Dosyası)
+## Proje Yapısı
 
 ```
 tele_drive_API/
@@ -56,12 +63,14 @@ tele_drive_API/
 │   ├── config/
 │   │   ├── env.ts                             # Zod ile env doğrulama
 │   │   ├── database.ts                        # TypeORM DataSource
-│   │   └── redis.ts                           # IORedis bağlantısı
+│   │   ├── redis.ts                           # IORedis bağlantısı
+│   │   └── swagger.ts                         # OpenAPI 3.0.3 spec (swagger-jsdoc)
 │   ├── jobs/
 │   │   ├── queues.ts                          # BullMQ Queue tanımları
 │   │   ├── processors/
-│   │   │   ├── generate-report.ts             # PDF + Excel üretimi, date normalizasyonu
-│   │   │   └── send-fault-alert.ts            # E-posta bildirimi
+│   │   │   ├── generate-report.ts             # PDF + Excel üretimi
+│   │   │   ├── send-fault-alert.ts            # Sensör arıza bildirimi
+│   │   │   └── send-threshold-alert.ts        # Batarya/hız eşiği bildirimi
 │   │   └── workers/
 │   │       ├── report.worker.ts               # Rapor worker'ı (concurrency: 2)
 │   │       └── notification.worker.ts         # Bildirim worker'ı (concurrency: 5)
@@ -73,22 +82,21 @@ tele_drive_API/
 │   │   └── rate-limit.ts                      # Rate limiter'lar
 │   ├── modules/
 │   │   ├── auth/                              # Kayıt, giriş, 2FA, token rotasyonu (6 dosya)
-│   │   ├── vehicles/                          # Araç CRUD, API key yönetimi (5 dosya)
-│   │   ├── telemetry/                         # Telemetri alımı ve sorgulama (5 dosya)
-│   │   ├── sensors/                           # Sensör alımı, arıza tespiti (5 dosya)
-│   │   ├── reports/                           # Rapor iş yönetimi (4 dosya)
-│   │   └── users/                             # User entity + repository (2 dosya)
-│   ├── app.ts                                 # Express app, middleware, landing page
+│   │   ├── vehicles/                          # Araç CRUD, eşik yönetimi, API key (6 dosya)
+│   │   ├── telemetry/                         # Telemetri alımı, sorgulama, stats (5 dosya)
+│   │   ├── sensors/                           # Sensör alımı, arıza tespiti, tip filtresi (5 dosya)
+│   │   ├── reports/                           # Rapor iş yönetimi, sayfalama (4 dosya)
+│   │   ├── users/                             # Kullanıcı yönetimi (fleet_manager) (5 dosya)
+│   │   └── dashboard/                         # Filo özet istatistikleri (3 dosya)
+│   ├── app.ts                                 # Express app, middleware, Swagger UI, landing page
 │   └── main.ts                                # Bootstrap, worker başlatma, graceful shutdown
 ├── scripts/
-│   ├── gen-docx.mjs                           # Teknik doküman üretici
-│   ├── gen-readme.mjs                         # README üretici
-│   └── gen-postman.mjs                        # Postman koleksiyonu üretici
+│   └── gen-docx-v2.mjs                        # Teknik doküman üretici
 ├── .env.example                               # Örnek ortam değişkenleri
 ├── .gitignore
 ├── docker-compose.yml                         # PostgreSQL + Redis
-├── postman_collection.json                    # 28 endpoint, 5 klasör
-├── TeleDrive_API_Teknik_Dokuman_v1.docx       # Teknik tasarım dokümanı
+├── postman_collection.json                    # 29 endpoint, 6 klasör
+├── TeleDrive_API_Teknik_Dokuman_v2.docx       # Teknik tasarım dokümanı
 ├── tsconfig.json
 └── package.json
 ```
@@ -142,6 +150,7 @@ docker compose up -d
 ```bash
 npm run dev
 # → http://localhost:3000
+# → http://localhost:3000/api/docs  (Swagger UI)
 ```
 
 ### Üretim Derlemesi
@@ -153,9 +162,17 @@ node dist/main.js
 
 ---
 
-## API Referansı
+## API Dokümantasyonu
 
-**Temel URL (yerel):** `http://localhost:3000/api`
+Sunucu ayağa kalktıktan sonra interaktif Swagger UI'a erişin:
+
+```
+http://localhost:3000/api/docs
+```
+
+Sağ üstteki **Authorize** butonuna JWT token'ınızı (`Bearer <token>`) veya API anahtarınızı girin — tüm endpoint'leri doğrudan tarayıcıdan test edebilirsiniz.
+
+**Temel URL:** `http://localhost:3000/api`
 
 Tüm yanıtlar şu formattadır:
 ```json
@@ -164,27 +181,31 @@ Tüm yanıtlar şu formattadır:
 
 ---
 
-### Genel Endpoint'ler
+## Endpoint Özeti
+
+### Genel
 
 | Metod | Yol | Açıklama | Auth |
 |-------|-----|----------|------|
 | `GET` | `/` | Landing page — API bilgisi ve endpoint listesi | — |
 | `GET` | `/health` | Sağlık kontrolü | — |
+| `GET` | `/api/docs` | Swagger UI (interaktif dokümantasyon) | — |
 
 **Landing Page Yanıtı:**
 ```json
 {
   "name": "TeleDrive API",
-  "description": "Otonom Araç Telemetri ve Filo Yönetim REST API",
   "version": "1.0.0",
   "status": "🟢 online",
-  "timestamp": "2026-06-05T10:00:00.000Z",
   "endpoints": {
-    "auth": "/api/auth",
-    "vehicles": "/api/vehicles",
+    "auth":      "/api/auth",
+    "vehicles":  "/api/vehicles",
     "telemetry": "/api/telemetry",
-    "sensors": "/api/sensors",
-    "reports": "/api/reports"
+    "sensors":   "/api/sensors",
+    "reports":   "/api/reports",
+    "dashboard": "/api/dashboard",
+    "users":     "/api/users",
+    "docs":      "/api/docs"
   }
 }
 ```
@@ -239,7 +260,7 @@ Ardından: `POST /2fa/verify` — `Authorization: Bearer <preAuthToken>` + `{ "t
 
 | Metod | Yol | Açıklama | Rol |
 |-------|-----|----------|-----|
-| `GET` | `/` | Araçları listele | Tüm JWT |
+| `GET` | `/` | Araçları listele (sayfalama + filtre) | Tüm JWT |
 | `POST` | `/` | Araç oluştur | fleet_manager |
 | `GET` | `/:id` | Araç detayı | Tüm JWT |
 | `PATCH` | `/:id` | Araç güncelle | fleet_manager |
@@ -257,11 +278,38 @@ Authorization: Bearer <accessToken>
   "assignedEngineerId": "uuid (isteğe bağlı)"
 }
 ```
-Yanıtta `apiKey` alanı bulunur — **yalnızca bir kez gösterilir, güvenli saklayın.**
+> Yanıtta `apiKey` alanı bulunur — **yalnızca bir kez gösterilir, güvenli saklayın.**
 
-**Query Parametreleri (`GET /`):**
-- `status` — `active` | `idle` | `fault` | `offline`
-- `model` — model adına göre filtrele
+**Araç Güncelle (eşik değerleri dahil):**
+```json
+PATCH /api/vehicles/:id
+{
+  "lowBatteryThreshold": 25,
+  "maxSpeedThreshold": 120
+}
+```
+> `maxSpeedThreshold: null` → hız kontrolü devre dışı
+
+**`GET /` Query Parametreleri:**
+
+| Parametre | Tip | Açıklama |
+|-----------|-----|----------|
+| `status` | string | `active` \| `idle` \| `fault` \| `offline` |
+| `model` | string | Model adına göre filtre |
+| `limit` | integer | Sayfa boyutu (varsayılan: 20, maks: 100) |
+| `offset` | integer | Sayfa başlangıcı (varsayılan: 0) |
+
+**Yanıt:**
+```json
+{
+  "data": {
+    "vehicles": [...],
+    "total": 47,
+    "limit": 20,
+    "offset": 0
+  }
+}
+```
 
 ---
 
@@ -287,7 +335,12 @@ X-Api-Key: td_abc123...
 }
 ```
 
-**Sorgulama Query Parametreleri** (Zod ile doğrulanır):
+> ⚠️ Telemetri alındığında eşik kontrolü yapılır:
+> - `batteryLevel < lowBatteryThreshold` → `low_battery` uyarısı kuyruğa alınır
+> - `speed > maxSpeedThreshold` → `high_speed` uyarısı kuyruğa alınır
+> - Araç `FAULT` durumundaysa statüsü `ACTIVE`/`IDLE`'a düşürülmez
+
+**Sorgulama Query Parametreleri:**
 
 | Parametre | Tip | Varsayılan | Kural |
 |-----------|-----|-----------|-------|
@@ -303,8 +356,8 @@ X-Api-Key: td_abc123...
 | Metod | Yol | Açıklama | Auth |
 |-------|-----|----------|------|
 | `POST` | `/api/sensors` | Sensör verisi gönder | X-Api-Key |
-| `GET` | `/api/vehicles/:id/sensors` | Tüm sensörler | JWT |
-| `GET` | `/api/vehicles/:id/sensors/faults` | Arızalı sensörler | JWT |
+| `GET` | `/api/vehicles/:id/sensors` | Her sensör tipinin son kaydı | JWT |
+| `GET` | `/api/vehicles/:id/sensors/faults` | Sadece arızalı sensörler | JWT |
 | `GET` | `/api/vehicles/:id/sensors/history` | Geçmiş kayıtlar | JWT |
 
 **Sensör Tipleri:** `lidar` · `camera` · `radar` · `gps` · `imu`
@@ -323,8 +376,15 @@ X-Api-Key: td_abc123...
 }
 ```
 
-**`/sensors/history` Query Parametreleri** (Zod ile doğrulanır):
-- `from` / `to` — ISO 8601 datetime string (isteğe bağlı)
+**`/sensors/history` Query Parametreleri:**
+
+| Parametre | Tip | Açıklama |
+|-----------|-----|----------|
+| `from` / `to` | ISO 8601 datetime | Zaman aralığı (isteğe bağlı) |
+| `sensorType` | string | `lidar` \| `camera` \| `radar` \| `gps` \| `imu` — tip filtresi |
+| `limit` | integer | Maks: 1000 (varsayılan: 200) |
+
+> `GET /sensors` — PostgreSQL `DISTINCT ON` ile her sensör tipinin gerçekten **en son** kaydını getirir.
 
 ---
 
@@ -332,33 +392,62 @@ X-Api-Key: td_abc123...
 
 | Metod | Yol | Açıklama | Auth |
 |-------|-----|----------|------|
-| `POST` | `/` | Rapor başlat | JWT |
-| `GET` | `/` | Raporları listele | JWT |
+| `POST` | `/` | Rapor başlat (asenkron) | JWT |
+| `GET` | `/` | Raporları listele (sayfalama) | JWT |
 | `GET` | `/:id` | Rapor durumu | JWT |
 | `GET` | `/:id/download` | Dosyayı indir | JWT |
 
 **Rapor Tipleri:**
-
 ```json
 // PDF — belirli araç için günlük sürüş raporu
-{
-  "type": "daily_pdf",
-  "vehicleId": "uuid",
-  "dateFrom": "2026-06-01",
-  "dateTo": "2026-06-05"
-}
+{ "type": "daily_pdf", "vehicleId": "uuid", "dateFrom": "2026-06-01", "dateTo": "2026-06-05" }
 
 // Excel — tüm filo özeti
-{
-  "type": "fleet_excel",
-  "dateFrom": "2026-06-01",
-  "dateTo": "2026-06-05"
-}
+{ "type": "fleet_excel", "dateFrom": "2026-06-01", "dateTo": "2026-06-05" }
 ```
+
+**`GET /` Query Parametreleri:** `?limit=20&offset=0` (maks. 100)
 
 **Rapor Durumları:** `pending` → `processing` → `done` / `failed`
 
-> `done` olduğunda `GET /:id/download` ile dosyayı indirin.
+---
+
+### Kullanıcı Yönetimi — `/api/users`
+
+> Tüm endpoint'ler `fleet_manager` rolü gerektirir.
+
+| Metod | Yol | Açıklama |
+|-------|-----|----------|
+| `GET` | `/` | Tüm kullanıcıları listele |
+| `GET` | `/:id` | Kullanıcı detayı (şifresiz) |
+| `PATCH` | `/:id` | Rol güncelle |
+| `DELETE` | `/:id` | Kullanıcı sil |
+
+> Kendi hesabını silme veya kendi rolünü değiştirme girişimi `400` döner.
+
+---
+
+### Dashboard — `/api/dashboard`
+
+| Metod | Yol | Açıklama | Auth |
+|-------|-----|----------|------|
+| `GET` | `/` | Filo özet snapshot | JWT (her iki rol) |
+
+**Yanıt:**
+```json
+{
+  "data": {
+    "totalVehicles": 20,
+    "activeVehicles": 12,
+    "faultVehicles": 3,
+    "offlineVehicles": 2,
+    "lowBatteryVehicles": [
+      { "id": "uuid", "plate": "34TDR01", "batteryLevel": 14.2, "threshold": 20 }
+    ],
+    "recentFaults": [...]
+  }
+}
+```
 
 ---
 
@@ -397,14 +486,18 @@ POST /2fa/verify →  Bearer <preAuthToken> + { "token": "123456" }
 ```
 Araç Cihazı
   │
-  ├── POST /api/telemetry (X-Api-Key)  →  TelemetryReading kaydedilir
+  ├── POST /api/telemetry (X-Api-Key)
+  │     ├── TelemetryReading kaydedilir
+  │     ├── batteryLevel < lowBatteryThreshold?
+  │     │     └── BullMQ → threshold-alert (low_battery) → mühendise e-posta
+  │     └── speed > maxSpeedThreshold?
+  │           └── BullMQ → threshold-alert (high_speed) → mühendise e-posta
   │
-  └── POST /api/sensors  (X-Api-Key)  →  SensorReading kaydedilir
-              │
-              └── status: "fault"?
-                    ├── Vehicle.status → FAULT
-                    └── BullMQ → notifications queue
-                                    └── Nodemailer → mühendise e-posta
+  └── POST /api/sensors (X-Api-Key)
+        ├── SensorReading kaydedilir
+        └── status: "fault"?
+              ├── Vehicle.status → FAULT
+              └── BullMQ → fault-alert → mühendise e-posta
 ```
 
 ---
@@ -421,16 +514,15 @@ Araç Cihazı
 
 ## Ortam Değişkenleri
 
-Tüm değişkenler için `.env.example` dosyasına bakın.
-
-**Kritik Değişkenler:**
-
 | Değişken | Açıklama |
 |----------|----------|
 | `JWT_SECRET` | En az 64 karakter — üretimde mutlaka değiştirin |
-| `DB_PORT` | Docker: `5433`, yerel PostgreSQL yoksa: `5432` |
-| `SMTP_HOST` | Yoksa bildirimler graceful olarak atlanır, uygulama çalışmaya devam eder |
-| `REPORTS_DIR` | PDF/Excel dosyalarının kaydedileceği klasör (varsayılan: `./tmp/reports`) |
+| `DB_HOST` / `DB_PORT` | PostgreSQL bağlantısı (Docker: `5433`) |
+| `REDIS_HOST` / `REDIS_PORT` | Redis bağlantısı |
+| `SMTP_HOST` | Yoksa bildirimler graceful olarak atlanır |
+| `REPORTS_DIR` | PDF/Excel dosya dizini (varsayılan: `./tmp/reports`) |
+
+Tüm değişkenler için `.env.example` dosyasına bakın.
 
 ---
 
@@ -441,9 +533,9 @@ Tüm değişkenler için `.env.example` dosyasına bakın.
 1. **Import** → `postman_collection.json` seç
 2. **Register** → **Login** çalıştır (token otomatik kaydedilir)
 3. **Create Vehicle** çalıştır (`vehicleId` + `vehicleApiKey` otomatik set edilir)
-4. Tüm 28 endpoint kullanıma hazır
+4. Tüm 29 endpoint kullanıma hazır
 
-**Klasörler:** Auth (8) · Vehicles (7) · Telemetry (4) · Sensors (5) · Reports (5)
+**Klasörler:** Auth (8) · Vehicles (7) · Telemetry (4) · Sensors (5) · Reports (4) · Users (4) · Dashboard (1)
 
 **Collection Variables:** `baseUrl` · `accessToken` · `refreshToken` · `preAuthToken` · `vehicleId` · `vehicleApiKey` · `reportId`
 
@@ -453,19 +545,19 @@ Tüm değişkenler için `.env.example` dosyasına bakın.
 
 ### TypeORM Date Normalizasyonu
 
-PostgreSQL `DATE` kolonları TypeORM'dan TypeScript'e `string` olarak döner. Bu nedenle rapor processor'da `.toISOString()` doğrudan çağrılmaz:
+PostgreSQL `DATE` kolonları TypeORM'dan TypeScript'e `string` olarak döner:
 
 ```typescript
 // YANLIŞ — TypeError atar
 job.dateFrom.toISOString()
 
-// DOĞRU — normalize et
+// DOĞRU
 new Date(job.dateFrom).toISOString()
 ```
 
 ### BullMQ Bağlantısı
 
-BullMQ kendi `ioredis` sürümünü bundle'a dahil eder. Dışarıdan `Redis` instance geçmek tip çakışması yaratır. Bu yüzden raw connection options kullanılır:
+BullMQ kendi `ioredis` sürümünü bundle'a dahil eder. Raw connection options kullanılır:
 
 ```typescript
 { connection: { host: env.REDIS_HOST, port: env.REDIS_PORT } }
@@ -473,7 +565,27 @@ BullMQ kendi `ioredis` sürümünü bundle'a dahil eder. Dışarıdan `Redis` in
 
 ### Custom TOTP
 
-`otplib` v13 Node.js 20'de API uyumsuzluğu nedeniyle kullanılamadığından `src/common/utils/totp.ts` içinde RFC 6238'e uygun custom implementasyon geliştirilmiştir. Node.js `crypto` modülü kullanılır, dış bağımlılık yoktur.
+`otplib` v13 Node.js 20'de API uyumsuzluğu yaratır. `src/common/utils/totp.ts` içinde RFC 6238'e uygun custom implementasyon geliştirilmiştir (Node.js `crypto` modülü, dış bağımlılık yok).
+
+### PostgreSQL DISTINCT ON
+
+`GET /api/vehicles/:id/sensors` — her sensör tipi için gerçekten en son kaydı getirmek üzere TypeORM query builder yerine raw SQL `DISTINCT ON (sensor_type)` kullanılır:
+
+```sql
+SELECT DISTINCT ON (sensor_type) *
+FROM sensor_readings
+WHERE vehicle_id = $1
+ORDER BY sensor_type, recorded_at DESC
+```
+
+### Express v5 Uyumluluğu
+
+Express v5'te `req.query` read-only getter'dır. Zod doğrulamasından gelen veri şu şekilde uygulanır:
+
+```typescript
+// req.query = result.data  ← Express v5'te hata verir
+Object.assign(req.query, result.data)  // ✅ mevcut nesneyi mutate et
+```
 
 ---
 
